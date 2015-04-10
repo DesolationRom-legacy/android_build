@@ -97,7 +97,7 @@ $(combo_2nd_arch_prefix)TARGET_arm_CFLAGS +=    -fstrict-aliasing \
                         -Werror=strict-aliasing
 endif
 
-ifeq ($(strip $(SUPPRES_UNUSED_WARNING)),true)
+ifeq ($(strip $(SUPPRESS_UNUSED_WARNING)),true)
 $(combo_2nd_arch_prefix)TARGET_arm_CFLAGS +=    -Wno-unused-parameter \
                         -Wno-unused-value \
                         -Wno-unused-function
@@ -126,7 +126,7 @@ $(combo_2nd_arch_prefix)TARGET_thumb_CFLAGS +=    -fstrict-aliasing \
                           -Werror=strict-aliasing
 endif
 
-ifeq ($(strip $(SUPPRES_UNUSED_WARNING)),true)
+ifeq ($(strip $(SUPPRESS_UNUSED_WARNING)),true)
 $(combo_2nd_arch_prefix)TARGET_thumb_CFLAGS += -Wno-unused-parameter \
                        -Wno-unused-value \
                        -Wno-unused-function
