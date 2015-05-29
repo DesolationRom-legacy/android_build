@@ -1687,6 +1687,7 @@ else
 	DESO_TARGET_PACKAGE := $(OUT)/Desolation-$(ROM_VERSION)-$(TARGET_PRODUCT_SHORT)-$(ROM_BUILDTYPE).zip
 endif
 
+BOOT_ZIP_FROM_ZIMAGE_SCRIPT := ./build/tools/releasetools/boot_flash_from_zimage
 BOOT_ZIP_FROM_IMAGE_SCRIPT := ./build/tools/releasetools/boot_flash_from_image
 KERNEL_PATH := $(TARGET_KERNEL_SOURCE)/arch/arm/configs/$(TARGET_KERNEL_CONFIG)
 
@@ -1762,6 +1763,15 @@ bootzip: bootimage
 	   $(recovery_fstab) \
 	   $(OUT) \
 	   $(TARGET_DEVICE)
+
+anykernelzip: bootimage
+	$(hide) cp -r ./build/tools/releasetools/anykernel-tools/* $(OUT)
+	$(BOOT_ZIP_FROM_ZIMAGE_SCRIPT) \
+	   $(recovery_fstab) \
+	   $(OUT) \
+	   $(TARGET_DEVICE) \
+	   "$(PRODUCT_MODEL)" \
+	   "$(PRODUCT_MANUFACTURER)"
 
 endif    # recovery_fstab is defined
 endif    # TARGET_NO_KERNEL != true
