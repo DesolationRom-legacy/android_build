@@ -1168,7 +1168,7 @@ ifeq ($(TARGET_PRODUCT),full)
 	@echo -e ${CL_GRN}"Please set your target device through lunch or breakfast"${CL_RST}
 	@echo -e ${CL_RED}"Cleaning aborted!"${CL_RST}
 else
-	@rm -rf $(ANDROID_BUILD_TOP)/prebuilts/chromium/$(TARGET_DEVICE)/
+	@rm -rf $(ANDROID_BUILD_TOP)/prebuilts/chromium/$(TARGET_PRODUCT_SHORT)/
 	@echo -e ${CL_GRN}"Removed prebuilt chromium"${CL_RST}
 endif
 
