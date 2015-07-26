@@ -1743,12 +1743,6 @@ endif
 otapackage: $(INTERNAL_OTA_PACKAGE_TARGET)
 
 deso: otapackage
-ifeq ($(USE_PREBUILT_CHROMIUM),1)
-ifneq ($(PRODUCT_PREBUILT_WEBVIEWCHROMIUM),yes)
-	@echo "Running Chromium prebuilt setup script..."
-	$(hide) . $(TOPDIR)vendor/deso/utils/chromium_prebuilt.sh $(TOP)
-endif
-endif
 	$(hide) ln -f $(INTERNAL_OTA_PACKAGE_TARGET) $(DESO_TARGET_PACKAGE)
 	$(hide) $(MD5SUM) $(DESO_TARGET_PACKAGE) > $(DESO_TARGET_PACKAGE).md5
 	$(hide) clear
