@@ -492,9 +492,6 @@ endif
 ifeq ($(MAKECMDGOALS),installclean)
 dont_bother := true
 endif
-ifeq ($(MAKECMDGOALS),chromiumclean)
-dont_bother := true
-endif
 
 # Bring in all modules that need to be built.
 ifeq ($(HOST_OS),windows)
@@ -1161,16 +1158,6 @@ recoveryclean:
 rootclean:
 	@rm -rf $(OUT_DIR)/target/product/*/root/
 	@echo -e ${CL_GRN}"All root components erased"${CL_RST}
-
-.PHONY: chromiumclean
-chromiumclean:
-ifeq ($(TARGET_PRODUCT),full)
-	@echo -e ${CL_GRN}"Please set your target device through lunch or breakfast"${CL_RST}
-	@echo -e ${CL_RED}"Cleaning aborted!"${CL_RST}
-else
-	@rm -rf $(ANDROID_BUILD_TOP)/prebuilts/chromium/$(TARGET_PRODUCT_SHORT)/
-	@echo -e ${CL_GRN}"Removed prebuilt chromium"${CL_RST}
-endif
 
 # The rules for dataclean and installclean are defined in cleanbuild.mk.
 
