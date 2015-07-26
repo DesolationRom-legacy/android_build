@@ -1162,6 +1162,16 @@ rootclean:
 	@rm -rf $(OUT_DIR)/target/product/*/root/
 	@echo -e ${CL_GRN}"All root components erased"${CL_RST}
 
+.PHONY: chromiumclean
+chromiumclean:
+ifeq ($(TARGET_PRODUCT),full)
+	@echo -e ${CL_GRN}"Please set your target device through lunch or breakfast"${CL_RST}
+	@echo -e ${CL_RED}"Cleaning aborted!"${CL_RST}
+else
+	@rm -rf $(ANDROID_BUILD_TOP)/prebuilts/chromium/$(TARGET_DEVICE)/
+	@echo -e ${CL_GRN}"Removed prebuilt chromium"${CL_RST}
+endif
+
 # The rules for dataclean and installclean are defined in cleanbuild.mk.
 
 #xxx scrape this from ALL_MODULE_NAME_TAGS

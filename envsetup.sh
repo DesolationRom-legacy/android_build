@@ -2065,16 +2065,6 @@ function chromium_prebuilt() {
     fi
 }
 
-function chromiumclean() {
-	if [ -z $TARGET_PRODUCT ]; then
-	echo "Please set your target device through lunch or breakfast"
-	echo "Prebuilt chromium cleaning aborted!"
-	else
-	rm -rf $ANDROID_BUILD_TOP/prebuilts/chromium/$TARGET_DEVICE/
-	chromium_prebuilt
-	fi
-}
-
 if [ "x$SHELL" != "x/bin/bash" ]; then
     case `ps -o command -p $$` in
         *bash*)
