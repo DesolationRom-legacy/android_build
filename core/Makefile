@@ -1085,7 +1085,7 @@ endif
 define build-systemimage-target
   $(hide) $(aromazip)
   @echo "Generating Changelog since $(changelog_date)"
-  $(hide) ./vendor/deso/utils/changelog_gen.sh $(changelog_date)
+  $(hide) ./vendor/deso/utils/changelog_gen.sh $(changelog_date) > /dev/null
   @echo "Target system fs image: $(1)"
   $(call create-system-vendor-symlink)
   @mkdir -p $(dir $(1)) $(systemimage_intermediates) && rm -rf $(systemimage_intermediates)/system_image_info.txt
