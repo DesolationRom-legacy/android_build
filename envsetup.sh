@@ -510,7 +510,30 @@ function mka() {
             make -j `sysctl hw.ncpu|cut -d" " -f2` "$@"
             ;;
         *)
+			local start_time=$(date +"%s")
             schedtool -B -n 1 -e ionice -n 1 make -j$(cat /proc/cpuinfo | grep "^processor" | wc -l) "$@"
+            local ret=$?
+			local end_time=$(date +"%s")
+			local tdiff=$(($end_time-$start_time))
+			local hours=$(($tdiff / 3600 ))
+			local mins=$((($tdiff % 3600) / 60))
+			local secs=$(($tdiff % 60))
+			echo
+			if [ $ret -eq 0 ] ; then
+				echo -n -e "#### \033[32mMake completed successfully\033[0m "
+			else
+				echo -n -e "#### \033[31mMake failed to build some targets\033[0m "
+			fi
+			if [ $hours -gt 0 ] ; then
+				printf "(%02g:%02g:%02g (hh:mm:ss))" $hours $mins $secs
+			elif [ $mins -gt 0 ] ; then
+				printf "(%02g:%02g (mm:ss))" $mins $secs
+			elif [ $secs -gt 0 ] ; then
+				printf "(%s seconds)" $secs
+			fi
+			echo -e " ####"
+			echo
+			return $ret
             ;;
     esac
 }
@@ -2027,11 +2050,11 @@ function make()
     local mins=$((($tdiff % 3600) / 60))
     local secs=$(($tdiff % 60))
     echo
-    if [ $ret -eq 0 ] ; then
-        echo -n -e "#### make completed successfully "
-    else
-        echo -n -e "#### make failed to build some targets "
-    fi
+	if [ $ret -eq 0 ] ; then
+		echo -n -e "#### \033[32mMake completed successfully\033[0m "
+	else
+		echo -n -e "#### \033[31mMake failed to build some targets\033[0m "
+	fi
     if [ $hours -gt 0 ] ; then
         printf "(%02g:%02g:%02g (hh:mm:ss))" $hours $mins $secs
     elif [ $mins -gt 0 ] ; then
