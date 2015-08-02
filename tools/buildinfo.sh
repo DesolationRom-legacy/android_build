@@ -28,6 +28,7 @@ echo "ro.product.screen_res=$PRODUCT_SCREEN_RES"
 echo "ro.product.screen_size=$PRODUCT_SCREEN_SIZE"
 echo "ro.product.board=$TARGET_BOOTLOADER_BOARD_NAME"
 echo "ro.product.cpu=$PRODUCT_CPU"
+echo "ro.product.bootanimationsize=$TARGET_BOOTANIMATION_NAME"
 # These values are deprecated, use "ro.product.cpu.abilist"
 # instead (see below).
 echo "# ro.product.cpu.abi and ro.product.cpu.abi2 are obsolete,"
