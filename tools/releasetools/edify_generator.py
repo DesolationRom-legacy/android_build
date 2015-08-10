@@ -406,6 +406,20 @@ class EdifyGenerator(object):
       self.script.append('unmount("%s");' % (p,))
     self.mounts = set()
 
+  def Banner(self):
+    self.script.append('ui_print("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=");')
+    self.script.append('ui_print("");')
+    self.script.append('ui_print("                Lets Get                  ");')
+    self.script.append('ui_print("  __");')
+    self.script.append('ui_print("|/  |                /      /            |");')
+    self.script.append('ui_print("|   | ___  ___  ___ (  ___ (___  ___  ___|");')
+    self.script.append('ui_print("|   ||___)|___ |   )| |   )|    |___)|   )");')
+    self.script.append('ui_print("|__/ |__   __/ |__/ | |__/||__  |__  |__/ ");')
+    self.script.append('ui_print("");')
+    self.script.append('ui_print("          Welcome to DesolationRom        ");')
+    self.script.append('ui_print("");')
+    self.script.append('ui_print("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=");')
+
   def AddToZip(self, input_zip, output_zip, input_path=None):
     """Write the accumulated script to the output_zip file.  input_zip
     is used as the source for the 'updater' binary needed to run
