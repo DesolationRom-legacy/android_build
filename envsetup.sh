@@ -2067,6 +2067,10 @@ function make()
     return $ret
 }
 
+function changelog()
+{
+  vendor/deso/utils/changelog_gen.sh $1
+}
 
 
 if [ "x$SHELL" != "x/bin/bash" ]; then
