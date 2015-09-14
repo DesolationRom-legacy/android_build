@@ -28,5 +28,7 @@ arch_variant_cflags += \
     -mfloat-abi=softfp \
     -mfpu=neon
 
+ifneq ($(TARGET_ARCH),arm64)
 arch_variant_ldflags := \
 	-Wl,--fix-cortex-a8
+endif
