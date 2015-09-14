@@ -178,8 +178,11 @@ TARGET_GLOBAL_CFLAGS += \
 			-w \
 			-O3 \
 			-fno-inline-functions \
-			-funroll-loops \
-			-mvectorize-with-neon-quad
+			-funroll-loops
+
+ifneq ($(TARGET_ARCH),arm64)
+	TARGET_GLOBAL_CFLAGS += -mvectorize-with-neon-quad
+endif
 
 ifeq ($(strip $(OPT_MEMORY)),true)
 $(combo_2nd_arch_prefix)TARGET_GLOBAL_CFLAGS += $(OPT_MEM)

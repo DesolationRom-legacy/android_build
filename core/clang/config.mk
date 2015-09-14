@@ -60,8 +60,11 @@ CLANG_CONFIG_UNKNOWN_CFLAGS := \
   -fno-canonical-system-headers \
   -fgcse-las \
   -fmodulo-sched \
-  -fmodulo-sched-allow-regmoves \
-  -mvectorize-with-neon-quad
+  -fmodulo-sched-allow-regmoves
+
+ifneq ($(TARGET_ARCH),arm64)
+  CLANG_CONFIG_UNKNOWN_CFLAGS += -mvectorize-with-neon-quad
+endif
 
 # Clang flags for all host rules
 CLANG_CONFIG_HOST_EXTRA_ASFLAGS :=
