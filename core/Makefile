@@ -1683,7 +1683,7 @@ endif
 WITH_DEXPREOPT_COMP := true
 
 ifdef BUILDTYPE_RELEASE
-	DESO_TARGET_PACKAGE := $(OUT)/Desolation-$(ROM_VERSION).$(shell date -u +%d)-$(TARGET_PRODUCT_SHORT)-$(ROM_BUILDTYPE).zip
+	DESO_TARGET_PACKAGE := $(OUT)/Desolation-$(ROM_VERSION)-$(ROM_BUILDTYPE).zip
 else
 	DESO_TARGET_PACKAGE := $(OUT)/Desolation-$(ROM_VERSION)-$(TARGET_PRODUCT_SHORT)-$(ROM_BUILDTYPE).zip
 endif
@@ -1751,7 +1751,7 @@ deso: otapackage
 	@echo -e ${CL_GRN}"zip: $(DESO_TARGET_PACKAGE)"${CL_RST}
 	@echo -e ${CL_GRN}"md5: "${CL_MAG}" `cat $(DESO_TARGET_PACKAGE).md5 | cut -d ' ' -f 1`"${CL_RST}
 	@echo -e ""
-
+	
 bootzip: bootimage
 	$(BOOT_ZIP_FROM_IMAGE_SCRIPT) \
 	   $(recovery_fstab) \
