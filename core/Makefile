@@ -1682,11 +1682,7 @@ endif
 
 WITH_DEXPREOPT_COMP := true
 
-ifdef BUILDTYPE_RELEASE
-	DESO_TARGET_PACKAGE := $(OUT)/Desolation-$(ROM_VERSION).$(shell date -u +%d)-$(TARGET_PRODUCT_SHORT)-$(ROM_BUILDTYPE).zip
-else
-	DESO_TARGET_PACKAGE := $(OUT)/Desolation-$(ROM_VERSION)-$(TARGET_PRODUCT_SHORT)-$(ROM_BUILDTYPE).zip
-endif
+DESO_TARGET_PACKAGE := $(OUT)/Desolation-$(TARGET_PRODUCT_SHORT)-$(shell date -u +%m.%d)-$(ROM_BUILDTYPE).zip
 
 BOOT_ZIP_FROM_IMAGE_SCRIPT := ./build/tools/releasetools/boot_flash_from_image
 KERNEL_PATH := $(TARGET_KERNEL_SOURCE)/arch/arm/configs/$(TARGET_KERNEL_CONFIG)
@@ -1757,6 +1753,10 @@ bootzip: bootimage
 	   $(recovery_fstab) \
 	   $(OUT) \
 	   $(TARGET_DEVICE)
+
+.PHONY: echotargetpackage
+echotargetpackage:
+	@echo "$(DESO_TARGET_PACKAGE)"
 
 endif    # recovery_fstab is defined
 endif    # TARGET_NO_KERNEL != true
