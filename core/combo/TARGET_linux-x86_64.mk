@@ -130,6 +130,10 @@ TARGET_GLOBAL_LDFLAGS += -Wl,--warn-shared-textrel
 TARGET_GLOBAL_LDFLAGS += -Wl,--fatal-warnings
 TARGET_GLOBAL_LDFLAGS += -Wl,--gc-sections
 
+TARGET_GLOBAL_CFLAGS += $(BOARD_GLOBAL_CFLAGS)
+TARGET_GLOBAL_CPPFLAGS += $(BOARD_GLOBAL_CPPFLAGS)
+TARGET_GLOBAL_LDFLAGS += $(BOARD_GLOBAL_LDFLAGS)
+
 TARGET_C_INCLUDES := \
 	$(libc_root)/arch-x86_64/include \
 	$(libc_root)/include \
@@ -154,7 +158,7 @@ define transform-o-to-shared-lib-inner
 $(hide) $(PRIVATE_CXX) \
 	$(PRIVATE_TARGET_GLOBAL_LDFLAGS) \
 	 -nostdlib -Wl,-soname,$(notdir $@) \
-	$(if $(filter true,$(PRIVATE_CLANG)),-shared,-Wl,-shared) \
+	 -shared -Bsymbolic \
 	$(PRIVATE_TARGET_GLOBAL_LD_DIRS) \
 	$(if $(filter true,$(PRIVATE_NO_CRT)),,$(PRIVATE_TARGET_CRTBEGIN_SO_O)) \
 	$(PRIVATE_ALL_OBJECTS) \

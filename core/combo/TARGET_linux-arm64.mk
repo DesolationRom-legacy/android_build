@@ -113,6 +113,10 @@ TARGET_GLOBAL_LDFLAGS += \
 			-Wl,-maarch64linux \
 			$(arch_variant_ldflags)
 
+TARGET_GLOBAL_CFLAGS += $(BOARD_GLOBAL_CFLAGS)
+TARGET_GLOBAL_CPPFLAGS += $(BOARD_GLOBAL_CPPFLAGS)
+TARGET_GLOBAL_LDFLAGS += $(BOARD_GLOBAL_LDFLAGS)
+
 TARGET_GLOBAL_CPPFLAGS += -fvisibility-inlines-hidden
 
 # More flags/options can be added here
@@ -162,7 +166,8 @@ define transform-o-to-shared-lib-inner
 $(hide) $(PRIVATE_CXX) \
 	-nostdlib -Wl,-soname,$(notdir $@) \
 	-Wl,--gc-sections \
-	$(if $(filter true,$(PRIVATE_CLANG)),-shared,-Wl,-shared) \
+	-Wl,-shared,-Bsymbolic \
+	-shared \
 	$(PRIVATE_TARGET_GLOBAL_LD_DIRS) \
 	$(if $(filter true,$(PRIVATE_NO_CRT)),,$(PRIVATE_TARGET_CRTBEGIN_SO_O)) \
 	$(PRIVATE_ALL_OBJECTS) \

@@ -4,11 +4,14 @@ Invoke ". build/envsetup.sh" from your shell to add the following functions to y
 - lunch:   lunch <product_name>-<build_variant>
 - tapas:   tapas [<App1> <App2> ...] [arm|x86|mips|armv5|arm64|x86_64|mips64] [eng|userdebug|user]
 - croot:   Changes directory to the top of the tree.
+- cout:    Changes directory to out.
 - m:       Makes from the top of the tree.
 - mm:      Builds all of the modules in the current directory, but not their dependencies.
 - mmm:     Builds all of the modules in the supplied directories, but not their dependencies.
            To limit the modules being built use the syntax: mmm dir/:target1,target2.
 - mma:     Builds all of the modules in the current directory, and their dependencies.
+- mmp:     Builds all of the modules in the current directory and pushes them to the device.
+- mmmp:    Builds all of the modules in the supplied directories and pushes them to the device.
 - mmma:    Builds all of the modules in the supplied directories, and their dependencies.
 - cgrep:   Greps on all local C/C++ files.
 - ggrep:   Greps on all local Gradle files.
@@ -16,6 +19,11 @@ Invoke ". build/envsetup.sh" from your shell to add the following functions to y
 - resgrep: Greps on all local res/*.xml files.
 - sgrep:   Greps on all local source files.
 - godir:   Go to the directory containing a file.
+- aospremote: Add git remote for matching AOSP repository
+- cafremote: Add git remote for matching CodeAurora repository.
+- cmremote: Add a git remote for matching CM repository.
+- mka:      Builds using SCHED_BATCH on all processors
+- reposync: Parallel repo sync using ionice and SCHED_BATCH
 
 Look at the source to view more functions. The complete list is:
 EOF
@@ -60,6 +68,14 @@ function check_product()
         echo "Couldn't locate the top of the tree.  Try setting TOP." >&2
         return
     fi
+
+    if (echo -n $1 | grep -q -e "^deso_") ; then
+       DESO_PRODUCT=$(echo -n $1 | sed -e 's/^deso_//g')
+    else
+       DESO_PRODUCT=
+    fi
+    export DESO_PRODUCT
+
         TARGET_PRODUCT=$1 \
         TARGET_BUILD_VARIANT= \
         TARGET_BUILD_TYPE= \
@@ -228,7 +244,6 @@ function set_stuff_for_environment()
     setpaths
     set_sequence_number
 
-    export ANDROID_BUILD_TOP=$(gettop)
     # With this environment variable new GCC can apply colors to warnings/errors
     export GCC_COLORS='error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01'
 }
@@ -245,35 +260,42 @@ function settitle()
         local product=$TARGET_PRODUCT
         local variant=$TARGET_BUILD_VARIANT
         local apps=$TARGET_BUILD_APPS
-        if [ -z "$apps" ]; then
-            export PROMPT_COMMAND="echo -ne \"\033]0;[${arch}-${product}-${variant}] ${USER}@${HOSTNAME}: ${PWD}\007\""
-        else
-            export PROMPT_COMMAND="echo -ne \"\033]0;[$arch $apps $variant] ${USER}@${HOSTNAME}: ${PWD}\007\""
+        if [ -z "$PROMPT_COMMAND"  ]; then
+            # No prompts
+            PROMPT_COMMAND="echo -ne \"\033]0;${USER}@${HOSTNAME}: ${PWD}\007\""
+        elif [ -z "$(echo $PROMPT_COMMAND | grep '033]0;')" ]; then
+            # Prompts exist, but no hardstatus
+            PROMPT_COMMAND="echo -ne \"\033]0;${USER}@${HOSTNAME}: ${PWD}\007\";${PROMPT_COMMAND}"
         fi
+        if [ ! -z "$ANDROID_PROMPT_PREFIX" ]; then
+            PROMPT_COMMAND="$(echo $PROMPT_COMMAND | sed -e 's/$ANDROID_PROMPT_PREFIX //g')"
+        fi
+
+        if [ -z "$apps" ]; then
+            ANDROID_PROMPT_PREFIX="[${arch}-${product}-${variant}]"
+        else
+            ANDROID_PROMPT_PREFIX="[$arch $apps $variant]"
+        fi
+        export ANDROID_PROMPT_PREFIX
+
+        # Inject build data into hardstatus
+        export PROMPT_COMMAND="$(echo $PROMPT_COMMAND | sed -e 's/\\033]0;\(.*\)\\007/\\033]0;$ANDROID_PROMPT_PREFIX \1\\007/g')"
     fi
 }
 
-function addcompletions()
+function check_bash_version()
 {
-    local T dir f
-
     # Keep us from trying to run in something that isn't bash.
     if [ -z "${BASH_VERSION}" ]; then
-        return
+        return 1
     fi
 
     # Keep us from trying to run in bash that's too old.
-    if [ ${BASH_VERSINFO[0]} -lt 3 ]; then
-        return
+    if [ "${BASH_VERSINFO[0]}" -lt 4 ] ; then
+        return 2
     fi
 
-    dir="sdk/bash_completion"
-    if [ -d ${dir} ]; then
-        for f in `/bin/ls ${dir}/[a-z]*.bash 2> /dev/null`; do
-            echo "including $f"
-            . $f
-        done
-    fi
+    return 0
 }
 
 function choosetype()
@@ -451,14 +473,6 @@ function add_lunch_combo()
     LUNCH_MENU_CHOICES=(${LUNCH_MENU_CHOICES[@]} $new_combo)
 }
 
-# add the default one here
-add_lunch_combo aosp_arm-eng
-add_lunch_combo aosp_arm64-eng
-add_lunch_combo aosp_mips-eng
-add_lunch_combo aosp_mips64-eng
-add_lunch_combo aosp_x86-eng
-add_lunch_combo aosp_x86_64-eng
-
 function print_lunch_menu()
 {
     local uname=$(uname)
@@ -471,11 +485,90 @@ function print_lunch_menu()
     local choice
     for choice in ${LUNCH_MENU_CHOICES[@]}
     do
-        echo "     $i. $choice"
+        echo " $i. $choice "
         i=$(($i+1))
-    done
+    done | column
 
     echo
+}
+
+function brunch()
+{
+    breakfast $*
+    if [ $? -eq 0 ]; then
+mka deso
+    else
+echo "No such item in brunch menu. Try 'breakfast'"
+        return 1
+    fi
+return $?
+}
+
+function mka() {
+    case `uname -s` in
+        Darwin)
+            make -j `sysctl hw.ncpu|cut -d" " -f2` "$@"
+            ;;
+        *)
+			local start_time=$(date +"%s")
+            schedtool -B -n 1 -e ionice -n 1 make -j$(cat /proc/cpuinfo | grep "^processor" | wc -l) "$@"
+            local ret=$?
+			local end_time=$(date +"%s")
+			local tdiff=$(($end_time-$start_time))
+			local hours=$(($tdiff / 3600 ))
+			local mins=$((($tdiff % 3600) / 60))
+			local secs=$(($tdiff % 60))
+			echo
+			if [ $ret -eq 0 ] ; then
+				echo -n -e "#### \033[32mMake completed successfully\033[0m "
+			else
+				echo -n -e "#### \033[31mMake failed to build some targets\033[0m "
+			fi
+			if [ $hours -gt 0 ] ; then
+				printf "(%02g:%02g:%02g (hh:mm:ss))" $hours $mins $secs
+			elif [ $mins -gt 0 ] ; then
+				printf "(%02g:%02g (mm:ss))" $mins $secs
+			elif [ $secs -gt 0 ] ; then
+				printf "(%s seconds)" $secs
+			fi
+			echo -e " ####"
+			echo
+			return $ret
+            ;;
+    esac
+}
+
+function breakfast()
+{
+    target=$1
+    local variant=$2
+    DESO_DEVICES_ONLY="true"
+    unset LUNCH_MENU_CHOICES
+    add_lunch_combo full-eng
+    for f in `/bin/ls vendor/deso/vendorsetup.sh 2> /dev/null`
+        do
+echo "including $f"
+            . $f
+        done
+unset f
+
+    if [ $# -eq 0 ]; then
+        # No arguments, so let's have the full menu
+        lunch
+    else
+        echo "z$target" | grep -q "-"
+        if [ $? -eq 0 ]; then
+            # A buildtype was specified, assume a full device name
+            lunch $target
+        else
+            # This is probably just the DesolationROM model name
+            if [ -z "$variant" ]; then
+                variant="userdebug"
+            fi
+            lunch deso_$target-$variant
+        fi
+fi
+return $?
 }
 
 function lunch()
@@ -517,6 +610,17 @@ function lunch()
 
     local product=$(echo -n $selection | sed -e "s/-.*$//")
     check_product $product
+    if [ $? -ne 0 ]
+    then
+        # if we can't find a product, try to grab it off the DesolationROM github
+        T=$(gettop)
+        pushd $T > /dev/null
+        build/tools/roomservice.py $product
+        popd > /dev/null
+        check_product $product
+    else
+        build/tools/roomservice.py $product true
+    fi
     if [ $? -ne 0 ]
     then
         echo
@@ -562,7 +666,7 @@ function _lunch()
     COMPREPLY=( $(compgen -W "${LUNCH_MENU_CHOICES[*]}" -- ${cur}) )
     return 0
 }
-complete -F _lunch lunch
+complete -F _lunch lunch 2>/dev/null
 
 # Configures the build to build unbundled apps.
 # Run tapas with one or more app names (from LOCAL_PACKAGE_NAME)
@@ -613,6 +717,57 @@ function tapas()
 
     set_stuff_for_environment
     printconfig
+}
+
+# Credit for color strip sed: http://goo.gl/BoIcm
+function mmmp()
+{
+    if [[ $# < 1 || $1 == "--help" || $1 == "-h" ]]; then
+        echo "mmmp [make arguments] <path-to-project>"
+        return 1
+    fi
+
+    # Get product name from deso_<product>
+    PRODUCT=`echo $TARGET_PRODUCT | tr "_" "\n" | tail -n 1`
+
+    adb start-server # Prevent unexpected starting server message from adb get-state in the next line
+    if [ $(adb get-state) != device -a $(adb shell busybox test -e /sbin/recovery 2> /dev/null; echo $?) != 0 ] ; then
+        echo "No device is online. Waiting for one..."
+        echo "Please connect USB and/or enable USB debugging"
+        until [ $(adb get-state) = device -o $(adb shell busybox test -e /sbin/recovery 2> /dev/null; echo $?) = 0 ];do
+            sleep 1
+        done
+        echo "Device Found.."
+    fi
+
+    adb root &> /dev/null
+    sleep 0.3
+    adb wait-for-device &> /dev/null
+    sleep 0.3
+    adb remount &> /dev/null
+
+    mmm $* | tee .log
+
+    # Install: <file>
+    LOC=$(cat .log | sed -r 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g' | grep 'Install' | cut -d ':' -f 2)
+
+    # Copy: <file>
+    LOC=$LOC $(cat .log | sed -r 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g' | grep 'Copy' | cut -d ':' -f 2)
+
+    for FILE in $LOC; do
+        # Get target file name (i.e. system/bin/adb)
+        TARGET=$(echo $FILE | sed "s/\/$PRODUCT\//\n/" | tail -n 1)
+
+        # Don't send files that are not in /system.
+        if ! echo $TARGET | egrep '^system\/' > /dev/null ; then
+            continue
+        else
+            echo "Pushing: $TARGET"
+            adb push $FILE $TARGET
+        fi
+    done
+    rm -f .log
+    return 0
 }
 
 function gettop
@@ -827,6 +982,15 @@ function croot()
         \cd $(gettop)
     else
         echo "Couldn't locate the top of the tree.  Try setting TOP."
+    fi
+}
+
+function cout()
+{
+    if [  "$OUT" ]; then
+        cd $OUT
+    else
+        echo "Couldn't locate out directory.  Try setting OUT."
     fi
 }
 
@@ -1300,6 +1464,107 @@ function gdbclient_old()
 
 }
 
+function dddclient()
+{
+   local OUT_ROOT=$(get_abs_build_var PRODUCT_OUT)
+   local OUT_SYMBOLS=$(get_abs_build_var TARGET_OUT_UNSTRIPPED)
+   local OUT_SO_SYMBOLS=$(get_abs_build_var TARGET_OUT_SHARED_LIBRARIES_UNSTRIPPED)
+   local OUT_VENDOR_SO_SYMBOLS=$(get_abs_build_var TARGET_OUT_VENDOR_SHARED_LIBRARIES_UNSTRIPPED)
+   local OUT_EXE_SYMBOLS=$(get_symbols_directory)
+   local PREBUILTS=$(get_abs_build_var ANDROID_PREBUILTS)
+   local ARCH=$(get_build_var TARGET_ARCH)
+   local GDB
+   case "$ARCH" in
+       arm) GDB=arm-linux-androideabi-gdb;;
+       arm64) GDB=arm-linux-androideabi-gdb; GDB64=aarch64-linux-android-gdb;;
+       mips|mips64) GDB=mips64el-linux-android-gdb;;
+       x86) GDB=x86_64-linux-android-gdb;;
+       x86_64) GDB=x86_64-linux-android-gdb;;
+       *) echo "Unknown arch $ARCH"; return 1;;
+   esac
+
+   if [ "$OUT_ROOT" -a "$PREBUILTS" ]; then
+       local EXE="$1"
+       if [ "$EXE" ] ; then
+           EXE=$1
+           if [[ $EXE =~ ^[^/].* ]] ; then
+               EXE="system/bin/"$EXE
+           fi
+       else
+           EXE="app_process"
+       fi
+
+       local PORT="$2"
+       if [ "$PORT" ] ; then
+           PORT=$2
+       else
+           PORT=":5039"
+       fi
+
+       local PID="$3"
+       if [ "$PID" ] ; then
+           if [[ ! "$PID" =~ ^[0-9]+$ ]] ; then
+               PID=`pid $3`
+               if [[ ! "$PID" =~ ^[0-9]+$ ]] ; then
+                   # that likely didn't work because of returning multiple processes
+                   # try again, filtering by root processes (don't contain colon)
+                   PID=`adb shell ps | \grep $3 | \grep -v ":" | awk '{print $2}'`
+                   if [[ ! "$PID" =~ ^[0-9]+$ ]]
+                   then
+                       echo "Couldn't resolve '$3' to single PID"
+                       return 1
+                   else
+                       echo ""
+                       echo "WARNING: multiple processes matching '$3' observed, using root process"
+                       echo ""
+                   fi
+               fi
+           fi
+           adb forward "tcp$PORT" "tcp$PORT"
+           local USE64BIT="$(is64bit $PID)"
+           adb shell gdbserver$USE64BIT $PORT --attach $PID &
+           sleep 2
+       else
+               echo ""
+               echo "If you haven't done so already, do this first on the device:"
+               echo "    gdbserver $PORT /system/bin/$EXE"
+                   echo " or"
+               echo "    gdbserver $PORT --attach <PID>"
+               echo ""
+       fi
+
+       OUT_SO_SYMBOLS=$OUT_SO_SYMBOLS$USE64BIT
+       OUT_VENDOR_SO_SYMBOLS=$OUT_VENDOR_SO_SYMBOLS$USE64BIT
+
+       echo >|"$OUT_ROOT/gdbclient.cmds" "set solib-absolute-prefix $OUT_SYMBOLS"
+       echo >>"$OUT_ROOT/gdbclient.cmds" "set solib-search-path $OUT_SO_SYMBOLS:$OUT_SO_SYMBOLS/hw:$OUT_SO_SYMBOLS/ssl/engines:$OUT_SO_SYMBOLS/drm:$OUT_SO_SYMBOLS/egl:$OUT_SO_SYMBOLS/soundfx:$OUT_VENDOR_SO_SYMBOLS:$OUT_VENDOR_SO_SYMBOLS/hw:$OUT_VENDOR_SO_SYMBOLS/egl"
+       echo >>"$OUT_ROOT/gdbclient.cmds" "source $ANDROID_BUILD_TOP/development/scripts/gdb/dalvik.gdb"
+       echo >>"$OUT_ROOT/gdbclient.cmds" "target remote $PORT"
+       # Enable special debugging for ART processes.
+       if [[ $EXE =~ (^|/)(app_process|dalvikvm)(|32|64)$ ]]; then
+          echo >> "$OUT_ROOT/gdbclient.cmds" "art-on"
+       fi
+       echo >>"$OUT_ROOT/gdbclient.cmds" ""
+
+       local WHICH_GDB=
+       # 64-bit exe found
+       if [ "$USE64BIT" != "" ] ; then
+           WHICH_GDB=$ANDROID_TOOLCHAIN/$GDB64
+       # 32-bit exe / 32-bit platform
+       elif [ "$(get_build_var TARGET_2ND_ARCH)" = "" ]; then
+           WHICH_GDB=$ANDROID_TOOLCHAIN/$GDB
+       # 32-bit exe / 64-bit platform
+       else
+           WHICH_GDB=$ANDROID_TOOLCHAIN_2ND_ARCH/$GDB
+       fi
+
+       ddd --debugger $WHICH_GDB -x "$OUT_ROOT/gdbclient.cmds" "$OUT_EXE_SYMBOLS/$EXE"
+  else
+       echo "Unable to determine build system output dir."
+   fi
+}
+
+
 case `uname -s` in
     Darwin)
         function sgrep()
@@ -1631,6 +1896,81 @@ function godir () {
     \cd $T/$pathname
 }
 
+function aospremote()
+{
+    git remote rm aosp 2> /dev/null
+    if [ ! -d .git ]
+    then
+        echo .git directory not found. Please run this from the root directory of the Android repository you wish to set up.
+    fi
+    PROJECT=`pwd -P | sed s#$ANDROID_BUILD_TOP/##g`
+    if (echo $PROJECT | grep -qv "^device")
+    then
+        PFX="platform/"
+    fi
+    git remote add aosp https://android.googlesource.com/$PFX$PROJECT
+    echo "Remote 'aosp' created"
+}
+
+function cafremote()
+{
+    git remote rm caf 2> /dev/null
+    if [ ! -d .git ]
+    then
+        echo .git directory not found. Please run this from the root directory of the Android repository you wish to set up.
+    fi
+    PROJECT=`pwd -P | sed s#$ANDROID_BUILD_TOP/##g`
+    if (echo $PROJECT | grep -qv "^device")
+    then
+        PFX="platform/"
+    fi
+    git remote add caf git://codeaurora.org/$PFX$PROJECT
+    echo "Remote 'caf' created"
+}
+
+function cmremote()
+{
+    git remote rm cm 2> /dev/null
+    if [ ! -d .git ]
+    then
+        echo .git directory not found. Please run this from the root directory of the Android repository you wish to set up.
+    fi
+    PROJECT=`pwd -P | sed s#$ANDROID_BUILD_TOP/##g`
+    PFX="android_$(echo $PROJECT | sed 's/\//_/g')"
+    git remote add cm git@github.com:CyanogenMod/$PFX
+    echo "Remote 'cm' created"
+}
+
+function repodiff() {
+    if [ -z "$*" ]; then
+        echo "Usage: repodiff <ref-from> [[ref-to] [--numstat]]"
+        return
+    fi
+    diffopts=$* repo forall -c \
+      'echo "$REPO_PATH ($REPO_REMOTE)"; git diff ${diffopts} 2>/dev/null ;'
+}
+
+function mka() {
+    case `uname -s` in
+        Darwin)
+            make -j `sysctl hw.ncpu|cut -d" " -f2` "$@"
+            ;;
+        *)
+            schedtool -B -n 1 -e ionice -n 1 make -j$(cat /proc/cpuinfo | grep "^processor" | wc -l) "$@"
+            ;;
+    esac
+}
+
+function reposync() {
+    case `uname -s` in
+        Darwin)
+            repo sync -j 4 "$@"
+            ;;
+        *)
+            schedtool -B -n 1 -e ionice -n 1 `which repo` sync -j 8 "$@"
+            ;;
+    esac
+}
 # Force JAVA_HOME to point to java 1.7 or java 1.6  if it isn't already set.
 #
 # Note that the MacOS path for java 1.7 includes a minor revision number (sigh).
@@ -1674,6 +2014,13 @@ function set_java_home() {
     fi
 }
 
+function repopick() {
+    set_stuff_for_environment
+    T=$(gettop)
+    $T/build/tools/repopick.py $@
+}
+
+
 # Print colored exit condition
 function pez {
     "$@"
@@ -1703,11 +2050,11 @@ function make()
     local mins=$((($tdiff % 3600) / 60))
     local secs=$(($tdiff % 60))
     echo
-    if [ $ret -eq 0 ] ; then
-        echo -n -e "#### make completed successfully "
-    else
-        echo -n -e "#### make failed to build some targets "
-    fi
+	if [ $ret -eq 0 ] ; then
+		echo -n -e "#### \033[32mMake completed successfully\033[0m "
+	else
+		echo -n -e "#### \033[31mMake failed to build some targets\033[0m "
+	fi
     if [ $hours -gt 0 ] ; then
         printf "(%02g:%02g:%02g (hh:mm:ss))" $hours $mins $secs
     elif [ $mins -gt 0 ] ; then
@@ -1720,14 +2067,20 @@ function make()
     return $ret
 }
 
+function changelog()
+{
+  vendor/deso/utils/changelog_gen.sh $1
+}
 
 
 if [ "x$SHELL" != "x/bin/bash" ]; then
     case `ps -o command -p $$` in
         *bash*)
             ;;
+        *zsh*)
+            ;;
         *)
-            echo "WARNING: Only bash is supported, use of other shell would lead to erroneous results"
+            echo "WARNING: Only bash and zsh are supported, use of other shell may lead to erroneous results"
             ;;
     esac
 fi
@@ -1741,4 +2094,17 @@ do
 done
 unset f
 
-addcompletions
+# Add completions
+check_bash_version && {
+    dirs="sdk/bash_completion vendor/deso/bash_completion"
+    for dir in $dirs; do
+    if [ -d ${dir} ]; then
+        for f in `/bin/ls ${dir}/[a-z]*.bash 2> /dev/null`; do
+            echo "including $f"
+            . $f
+        done
+    fi
+    done
+}
+
+export ANDROID_BUILD_TOP=$(gettop)

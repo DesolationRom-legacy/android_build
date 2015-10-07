@@ -1,3 +1,13 @@
+ifneq ($(BUILD_WITH_COLORS),0)
+  CL_RED="\033[31m"
+  CL_GRN="\033[32m"
+  CL_YLW="\033[33m"
+  CL_BLU="\033[34m"
+  CL_MAG="\033[35m"
+  CL_CYN="\033[36m"
+  CL_RST="\033[0m"
+endif
+
 # ---------------------------------------------------------------
 # the setpath shell function in envsetup.sh uses this to figure out
 # what to add to the path given the config we have chosen.
@@ -64,7 +74,24 @@ endif # CALLED_FROM_SETUP
 
 ifneq ($(PRINT_BUILD_CONFIG),)
 HOST_OS_EXTRA:=$(shell python -c "import platform; print(platform.platform())")
-$(info ============================================)
+$(info $(shell echo -e ${CL_CYN}=======================${CL_RST}))
+$(info $(shell echo ))
+$(info $(shell echo -e ${CL_CYN}Welcome to DesolationRom${CL_RST}))
+$(info $(shell echo -e Rom Buildtype is $(DESO_VERSION)))
+$(info $(shell echo -e Changelog Start Date is $(changelog_date)))
+$(info $(shell echo ))
+$(info $(shell echo -e ${CL_CYN}=======================${CL_RST}))
+$(info $(shell echo -e ${CL_CYN}Optimizations set for your device are ${CL_RST}))
+$(info   TARGET_GCC_VERSION_ARM=$(TARGET_GCC_VERSION_ARM))
+$(info   TARGET_GCC_VERSION_EXP=$(TARGET_GCC_VERSION_EXP))
+$(info   SUPPRESS_UNUSED_WARNING=$(SUPPRES_UNUSED_WARNING))
+$(info   STRICT_ALIASING=$(STRICT_ALIASING))
+$(info   TARGET_USE_O3=$(TARGET_USE_O3))
+$(info   OPT_MEMORY=$(OPT_MEMORY))
+$(info $(shell echo ))
+$(info $(shell echo -e ${CL_CYN}=======================${CL_RST}))
+$(info $(shell echo -e ${CL_CYN}Other information${CL_RST}))
+$(info $(shell echo ))
 $(info   PLATFORM_VERSION_CODENAME=$(PLATFORM_VERSION_CODENAME))
 $(info   PLATFORM_VERSION=$(PLATFORM_VERSION))
 $(info   TARGET_PRODUCT=$(TARGET_PRODUCT))
@@ -74,14 +101,16 @@ $(info   TARGET_BUILD_APPS=$(TARGET_BUILD_APPS))
 $(info   TARGET_ARCH=$(TARGET_ARCH))
 $(info   TARGET_ARCH_VARIANT=$(TARGET_ARCH_VARIANT))
 $(info   TARGET_CPU_VARIANT=$(TARGET_CPU_VARIANT))
-$(info   TARGET_2ND_ARCH=$(TARGET_2ND_ARCH))
-$(info   TARGET_2ND_ARCH_VARIANT=$(TARGET_2ND_ARCH_VARIANT))
-$(info   TARGET_2ND_CPU_VARIANT=$(TARGET_2ND_CPU_VARIANT))
 $(info   HOST_ARCH=$(HOST_ARCH))
 $(info   HOST_OS=$(HOST_OS))
 $(info   HOST_OS_EXTRA=$(HOST_OS_EXTRA))
 $(info   HOST_BUILD_TYPE=$(HOST_BUILD_TYPE))
 $(info   BUILD_ID=$(BUILD_ID))
 $(info   OUT_DIR=$(OUT_DIR))
-$(info ============================================)
+ifeq ($(CYNGN_TARGET),true)
+$(info   CYNGN_TARGET=$(CYNGN_TARGET))
+$(info   CYNGN_FEATURES=$(CYNGN_FEATURES))
+endif
+$(info $(shell echo ))
+$(info $(shell echo -e ${CL_CYN}=======================${CL_RST}))
 endif

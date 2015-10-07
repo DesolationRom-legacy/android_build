@@ -46,7 +46,6 @@ $(warning *  You are using version $(MAKE_VERSION) of make.)
 $(warning *  Android can only be built by versions 3.81 and higher.)
 $(warning *  see https://source.android.com/source/download.html)
 $(warning ********************************************************************************)
-$(error stopping)
 endif
 endif
 
@@ -98,10 +97,14 @@ include $(BUILD_SYSTEM)/config.mk
 # be generated correctly
 include $(BUILD_SYSTEM)/cleanbuild.mk
 
+# Bring in Qualcomm helper macros
+include $(BUILD_SYSTEM)/qcom_utils.mk
+
 # Include the google-specific config
 -include vendor/google/build/config.mk
 
 VERSION_CHECK_SEQUENCE_NUMBER := 5
+
 -include $(OUT_DIR)/versions_checked.mk
 ifneq ($(VERSION_CHECK_SEQUENCE_NUMBER),$(VERSIONS_CHECKED))
 
@@ -142,10 +145,10 @@ javac_version_str := $(shell unset _JAVA_OPTIONS && javac -version 2>&1)
 # Check for the correct version of java, should be 1.7 by
 # default, and 1.6 if LEGACY_USE_JAVA6 is set.
 ifeq ($(LEGACY_USE_JAVA6),)
-required_version := "1.7.x"
-required_javac_version := "1.7"
-java_version := $(shell echo '$(java_version_str)' | grep '^java .*[ "]1\.7[\. "$$]')
-javac_version := $(shell echo '$(javac_version_str)' | grep '[ "]1\.7[\. "$$]')
+required_version := "1.7.x/1.8.x"
+required_javac_version := "1.7/1.8"
+java_version := $(shell echo '$(java_version_str)' | grep -E '^(java|openjdk) .*[ "]1\.[78][\. "$$]')
+javac_version := $(shell echo '$(javac_version_str)' | grep '[ "]1\.[78][\. "$$]')
 else # if LEGACY_USE_JAVA6
 required_version := "1.6.x"
 required_javac_version := "1.6"
@@ -163,8 +166,9 @@ $(info The required version is: $(required_version))
 $(info $(space))
 $(info Please follow the machine setup instructions at)
 $(info $(space)$(space)$(space)$(space)https://source.android.com/source/initializing.html)
+$(info $(space))
+$(info Continue at your own peril!)
 $(info ************************************************************)
-$(error stop)
 endif
 
 # Check for the current JDK.
@@ -188,7 +192,6 @@ $(info ************************************************************)
 $(info You asked for an OpenJDK 7 build but your version is)
 $(info $(java_version_str).)
 $(info ************************************************************)
-$(error stop)
 endif # java version is not OpenJdk
 else # if requires_openjdk
 ifneq ($(shell echo '$(java_version_str)' | grep -i openjdk),)
@@ -199,7 +202,6 @@ $(info You use OpenJDK but only Sun/Oracle JDK is supported.)
 $(info Please follow the machine setup instructions at)
 $(info $(space)$(space)$(space)$(space)https://source.android.com/source/download.html)
 $(info ************************************************************)
-$(error stop)
 endif # java version is not Sun Oracle JDK
 endif # if requires_openjdk
 
@@ -215,7 +217,6 @@ $(info $(space))
 $(info Please follow the machine setup instructions at)
 $(info $(space)$(space)$(space)$(space)https://source.android.com/source/download.html)
 $(info ************************************************************)
-$(error stop)
 endif
 
 
@@ -351,11 +352,11 @@ ifneq (,$(user_variant))
 
 else # !user_variant
   # Turn on checkjni for non-user builds.
-  ADDITIONAL_BUILD_PROPERTIES += ro.kernel.android.checkjni=1
+  # ADDITIONAL_BUILD_PROPERTIES += ro.kernel.android.checkjni=1
   # Set device insecure for non-user builds.
   ADDITIONAL_DEFAULT_PROPERTIES += ro.secure=0
   # Allow mock locations by default for non user builds
-  ADDITIONAL_DEFAULT_PROPERTIES += ro.allow.mock.location=1
+  ADDITIONAL_DEFAULT_PROPERTIES += ro.allow.mock.location=0
 endif # !user_variant
 
 ifeq (true,$(strip $(enable_target_debugging)))
@@ -450,6 +451,48 @@ ifeq ($(filter-out $(INTERNAL_MODIFIER_TARGETS),$(MAKECMDGOALS)),)
 $(INTERNAL_MODIFIER_TARGETS): $(DEFAULT_GOAL)
 endif
 
+# These targets are going to delete stuff, don't bother including
+# the whole directory tree if that's all we're going to do
+ifeq ($(MAKECMDGOALS),clean)
+dont_bother := true
+endif
+ifeq ($(MAKECMDGOALS),clobber)
+dont_bother := true
+endif
+ifeq ($(MAKECMDGOALS),novo)
+dont_bother := true
+endif
+ifeq ($(MAKECMDGOALS),magic)
+dont_bother := true
+endif
+ifeq ($(MAKECMDGOALS),dirty)
+dont_bother := true
+endif
+ifeq ($(MAKECMDGOALS),appclean)
+dont_bother := true
+endif
+ifeq ($(MAKECMDGOALS),imgclean)
+dont_bother := true
+endif
+ifeq ($(MAKECMDGOALS),kernelclean)
+dont_bother := true
+endif
+ifeq ($(MAKECMDGOALS),systemclean)
+dont_bother := true
+endif
+ifeq ($(MAKECMDGOALS),recoveryclean)
+dont_bother := true
+endif
+ifeq ($(MAKECMDGOALS),rootclean)
+dont_bother := true
+endif
+ifeq ($(MAKECMDGOALS),dataclean)
+dont_bother := true
+endif
+ifeq ($(MAKECMDGOALS),installclean)
+dont_bother := true
+endif
+
 # Bring in all modules that need to be built.
 ifeq ($(HOST_OS),windows)
 SDK_ONLY := true
@@ -515,7 +558,7 @@ ifneq ($(dont_bother),true)
 subdir_makefiles := \
 	$(shell build/tools/findleaves.py --prune=$(OUT_DIR) --prune=.repo --prune=.git $(subdirs) Android.mk)
 
-$(foreach mk, $(subdir_makefiles), $(info including $(mk) ...)$(eval include $(mk)))
+$(foreach mk, $(subdir_makefiles), $(eval include $(mk)))
 
 endif # dont_bother
 
@@ -718,15 +761,15 @@ else
 endif
 
 eng_MODULES := $(sort \
-        $(call get-tagged-modules,eng) \
+        $(call module-installed-files, $(call module-names-for-tag-list,eng)) \
         $(call module-installed-files, $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_PACKAGES_ENG)) \
     )
 debug_MODULES := $(sort \
-        $(call get-tagged-modules,debug) \
+        $(call module-installed-files, $(call module-names-for-tag-list,debug)) \
         $(call module-installed-files, $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_PACKAGES_DEBUG)) \
     )
 tests_MODULES := $(sort \
-        $(call get-tagged-modules,tests) \
+        $(call module-installed-files, $(call module-names-for-tag-list,tests)) \
         $(call module-installed-files, $(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_PACKAGES_TESTS)) \
     )
 
@@ -1039,7 +1082,7 @@ $(foreach module,$(sample_MODULES),$(eval $(call \
 sample_ADDITIONAL_INSTALLED := \
         $(filter-out $(modules_to_install) $(modules_to_check) $(ALL_PREBUILT),$(sample_MODULES))
 samplecode: $(sample_APKS_COLLECTION)
-	@echo "Collect sample code apks: $^"
+	@echo -e ${CL_GRN}"Collect sample code apks:"${CL_RST}" $^"
 	# remove apks that are not intended to be installed.
 	rm -f $(sample_ADDITIONAL_INSTALLED)
 endif  # samplecode in $(MAKECMDGOALS)
@@ -1050,17 +1093,78 @@ findbugs: $(INTERNAL_FINDBUGS_HTML_TARGET) $(INTERNAL_FINDBUGS_XML_TARGET)
 .PHONY: clean
 clean:
 	@rm -rf $(OUT_DIR)/*
-	@echo "Entire build directory removed."
+	@echo -e ${CL_GRN}"Entire build directory removed."${CL_RST}
 
 .PHONY: clobber
 clobber: clean
+
+# This should be almost as good as a clobber but keeping many of the time intensive files - DHO
+.PHONY: novo
+novo:
+	@rm -rf $(OUT_DIR)/target/*
+	@echo -e ${CL_GRN}"Target directory removed."${CL_RST}
+	
+# This is one step better then novo, only clearing target/product
+.PHONY: magic
+magic:
+	@rm -rf $(OUT_DIR)/target/product/*
+	@echo -e ${CL_GRN}"Target/Product directory removed."${CL_RST}	
+
+# Clears out zip and build.prop
+.PHONY: dirty
+dirty:
+	@rm -rf $(OUT_DIR)/target/product/*/system/build.prop
+	@rm -rf $(OUT_DIR)/target/product/*/*.zip
+	@rm -rf $(OUT_DIR)/target/product/*/*.md5
+	@rm -rf $(OUT_DIR)/target/product/*/*.txt
+	@echo -e ${CL_GRN}"build.prop, changelog and zip files erased"${CL_RST}	
+
+# Clears out all apks
+.PHONY: appclean
+appclean:
+	@rm -rf $(OUT_DIR)/target/product/*/system/app
+	@rm -rf $(OUT_DIR)/target/product/*/system/priv-app
+	@echo -e ${CL_GRN}"All apks erased"${CL_RST}
+
+# Clears out all .img files
+.PHONY: imgclean
+imgclean:
+	@rm -rf $(OUT_DIR)/target/product/*/*.img
+	@echo -e ${CL_GRN}"All .img files erased"${CL_RST}
+
+# Clears out all kernel stuff
+.PHONY: kernelclean
+kernelclean:
+	@rm -rf $(OUT_DIR)/target/product/*/kernel
+	@rm -rf $(OUT_DIR)/target/product/*/boot.img
+	@echo -e ${CL_GRN}"All kernel compnents erased"${CL_RST}
+
+# Clears out all system stuff
+.PHONY: systemclean
+systemclean:
+	@rm -rf $(OUT_DIR)/target/product/*/system/
+	@rm -rf $(OUT_DIR)/target/product/*/system.img
+	@echo -e ${CL_GRN}"System components erased"${CL_RST}
+
+# Clears out all recovery stuff
+.PHONY: recoveryclean
+recoveryclean:
+	@rm -rf $(OUT_DIR)/target/product/*/recovery/
+	@rm -rf $(OUT_DIR)/target/product/*/recovery.img
+	@echo -e ${CL_GRN}"All recovery components erased"${CL_RST}
+
+# Clears out all root stuff
+.PHONY: rootclean
+rootclean:
+	@rm -rf $(OUT_DIR)/target/product/*/root/
+	@echo -e ${CL_GRN}"All root components erased"${CL_RST}
 
 # The rules for dataclean and installclean are defined in cleanbuild.mk.
 
 #xxx scrape this from ALL_MODULE_NAME_TAGS
 .PHONY: modules
 modules:
-	@echo "Available sub-modules:"
+	@echo -e ${CL_GRN}"Available sub-modules:"${CL_RST}
 	@echo "$(call module-names-for-tag-list,$(ALL_MODULE_TAGS))" | \
 	      tr -s ' ' '\n' | sort -u | $(COLUMN)
 

@@ -17,8 +17,8 @@
 # Select a combo based on the compiler being used.
 #
 # Inputs:
-#	combo_target -- prefix for final variables (HOST_ or TARGET_)
-#	combo_2nd_arch_prefix -- it's defined if this is loaded for the 2nd arch.
+# combo_target -- prefix for final variables (HOST_ or TARGET_)
+# combo_2nd_arch_prefix -- it's defined if this is loaded for the 2nd arch.
 #
 
 # Build a target string like "linux-arm" or "darwin-x86".
@@ -49,12 +49,35 @@ $(combo_var_prefix)HAVE_STRLCPY := 0
 $(combo_var_prefix)HAVE_STRLCAT := 0
 $(combo_var_prefix)HAVE_KERNEL_MODULES := 0
 
+# Highly experimental, use with extreme caution.
+# -fgcse-las & -fpredictive-commoning = memory optimization flags, does not increase code size. gcse-las is not envoked by any -*O flags.
+# -fpredictive-commoning is enabled by default when using -O3. So if using -O3 there's no need to pass it twice.
+OPT_MEM := -fgcse-las
+ifneq ($(TARGET_USE_O3),true)
+OPT_MEM += -fpredictive-commoning
+endif
+
 $(combo_var_prefix)GLOBAL_CFLAGS := -fno-exceptions -Wno-multichar
-$(combo_var_prefix)RELEASE_CFLAGS := -O2 -g -fno-strict-aliasing
+ifeq ($(TARGET_USE_03),true)
+$(combo_var_prefix)RELEASE_CFLAGS := -O3 -fno-strict-aliasing
+$(combo_var_prefix)GLOBAL_CPPFLAGS :=
+$(combo_var_prefix)GLOBAL_LDFLAGS := -Wl,-O1 -Wl,--as-needed -Wl,--relax -Wl,--sort-common -Wl,--gc-sections
+$(combo_var_prefix)RELEASE_CFLAGS := -O2 -g
 $(combo_var_prefix)GLOBAL_CPPFLAGS :=
 $(combo_var_prefix)GLOBAL_LDFLAGS :=
+endif
 $(combo_var_prefix)GLOBAL_ARFLAGS := crsPD
 $(combo_var_prefix)GLOBAL_LD_DIRS :=
+
+ifeq ($(strip $(OPT_MEMORY)),true)
+$(combo_var_prefix)RELEASE_CFLAGS += $(OPT_MEM)
+endif
+
+ifeq ($(strip $(STRICT_ALIASING)),true)
+$(combo_var_prefix)RELEASE_CFLAGS += -fstrict-aliasing -Wstrict-aliasing=3 -Werror=strict-aliasing
+else
+$(combo_var_prefix)RELEASE_CFLAGS += -fno-strict-aliasing
+endif
 
 $(combo_var_prefix)EXECUTABLE_SUFFIX :=
 $(combo_var_prefix)SHLIB_SUFFIX := .so
@@ -80,19 +103,33 @@ ifneq ($(USE_CCACHE),)
   # We don't really use system headers much so the rootdir is
   # fine; ensures these paths are relative for all Android trees
   # on a workstation.
-  export CCACHE_BASEDIR := /
+  ifeq ($(CCACHE_BASEDIR),)
+    export CCACHE_BASEDIR := /
+  endif
 
   # Workaround for ccache with clang.
   # See http://petereisentraut.blogspot.com/2011/09/ccache-and-clang-part-2.html
   export CCACHE_CPP2 := true
 
-  CCACHE_HOST_TAG := $(HOST_PREBUILT_TAG)
-  # If we are cross-compiling Windows binaries on Linux
-  # then use the linux ccache binary instead.
-  ifeq ($(HOST_OS)-$(BUILD_OS),windows-linux)
-    CCACHE_HOST_TAG := linux-$(HOST_PREBUILT_ARCH)
+  # It has been shown that ccache 3.x using direct mode can be several times
+  # faster than using the current ccache 2.4 that is used by default
+  # use the system ccache if asked to, else default to the one in prebuilts
+
+  ifeq ($(USE_SYSTEM_CCACHE),)
+    ccache :=
+  else
+    ccache := $(shell which ccache)
   endif
-  ccache := prebuilts/misc/$(CCACHE_HOST_TAG)/ccache/ccache
+
+  ifeq ($(ccache),)
+    CCACHE_HOST_TAG := $(HOST_PREBUILT_TAG)
+    # If we are cross-compiling Windows binaries on Linux
+    # then use the linux ccache binary instead.
+    ifeq ($(HOST_OS)-$(BUILD_OS),windows-linux)
+      CCACHE_HOST_TAG := linux-$(HOST_PREBUILT_ARCH)
+    endif
+    ccache := prebuilts/misc/$(CCACHE_HOST_TAG)/ccache/ccache
+  endif
   # Check that the executable is here.
   ccache := $(strip $(wildcard $(ccache)))
   ifdef ccache

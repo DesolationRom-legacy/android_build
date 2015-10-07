@@ -108,6 +108,10 @@ $(combo_2nd_arch_prefix)TARGET_GLOBAL_LDFLAGS += \
 			-Wl,--fatal-warnings \
 			$(arch_variant_ldflags)
 
+$(combo_2nd_arch_prefix)TARGET_GLOBAL_CFLAGS += $(BOARD_GLOBAL_CFLAGS)
+$(combo_2nd_arch_prefix)TARGET_GLOBAL_CPPFLAGS += $(BOARD_GLOBAL_CPPFLAGS)
+$(combo_2nd_arch_prefix)TARGET_GLOBAL_LDFLAGS += $(BOARD_GLOBAL_LDFLAGS)
+
 $(combo_2nd_arch_prefix)TARGET_GLOBAL_CPPFLAGS += -fvisibility-inlines-hidden
 
 # More flags/options can be added here
@@ -168,7 +172,8 @@ define $(combo_2nd_arch_prefix)transform-o-to-shared-lib-inner
 $(hide) $(PRIVATE_CXX) \
 	-nostdlib -Wl,-soname,$(notdir $@) \
 	-Wl,--gc-sections \
-	$(if $(filter true,$(PRIVATE_CLANG)),-shared,-Wl,-shared) \
+	-Wl,-shared,-Bsymbolic \
+	-shared \
 	$(PRIVATE_TARGET_GLOBAL_LD_DIRS) \
 	$(if $(filter true,$(PRIVATE_NO_CRT)),,$(PRIVATE_TARGET_CRTBEGIN_SO_O)) \
 	$(PRIVATE_ALL_OBJECTS) \
