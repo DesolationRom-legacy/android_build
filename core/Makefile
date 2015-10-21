@@ -1682,11 +1682,7 @@ endif
 
 WITH_DEXPREOPT_COMP := true
 
-ifdef BUILDTYPE_RELEASE
-	DESO_TARGET_PACKAGE := $(OUT)/Desolation-$(ROM_VERSION).$(shell date -u +%d)-$(TARGET_PRODUCT_SHORT)-$(ROM_BUILDTYPE).zip
-else
-	DESO_TARGET_PACKAGE := $(OUT)/Desolation-$(ROM_VERSION)-$(TARGET_PRODUCT_SHORT)-$(ROM_BUILDTYPE).zip
-endif
+DESO_TARGET_PACKAGE := $(OUT)/Desolation-$(BUILD_ID).$(shell date -u +%m-%d)-$(TARGET_PRODUCT_SHORT)-$(ROM_BUILDTYPE).zip
 
 BOOT_ZIP_FROM_IMAGE_SCRIPT := ./build/tools/releasetools/boot_flash_from_image
 KERNEL_PATH := $(TARGET_KERNEL_SOURCE)/arch/arm/configs/$(TARGET_KERNEL_CONFIG)
